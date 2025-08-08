@@ -2,42 +2,55 @@ package com.football.news.service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.football.news.model.Article;
 
 @Service
 public class NewsService {
 
+    @Value("${newsapi.key}")
+    private String apiKey;
+
     public List<Article> getNewsByTeams(List<String> teams) {
-        List<Article> dummyArticles = new ArrayList<>();
+        List<Article> allArticles = new ArrayList<>();
+        RestTemplate restTemplate = new RestTemplate();
 
-        Article article1 = new Article();
-        article1.setTitle("Chelsea win big in Champions League");
-        article1.setDescription("Chelsea beat Barcelona 3-1 in a thrilling game.");
-        article1.setUrl("https://example.com/news1");
+        for (String team : teams) {
+            String url = UriComponentsBuilder.fromHttpUrl("https://newsapi.org/v2/everything")
+                    .queryParam("q", team)
+                    .queryParam("apiKey", apiKey)
+                    .queryParam("language", "en")
+                    .queryParam("sortBy", "publishedAt")
+                    .toUriString();
 
-        Article article2 = new Article();
-        article2.setTitle("Barcelona signs new striker");
-        article2.setDescription("Barcelona signs a young talent from Brazil.");
-        article2.setUrl("https://example.com/news2");
+            try {
+                NewsApiResponse response = restTemplate.getForObject(url, NewsApiResponse.class);
+                if (response != null && response.getArticles() != null) {
+                    allArticles.addAll(response.getArticles());
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to fetch news for team: " + team + " – " + e.getMessage());
+            }
+        }
 
-        Article article3 = new Article();
-        article3.setTitle("PSG prepares for new season");
-        article3.setDescription("PSG reveals their preseason plans.");
-        article3.setUrl("https://example.com/news3");
+        return allArticles;
+    }
 
-        dummyArticles.add(article1);
-        dummyArticles.add(article2);
-        dummyArticles.add(article3);
+    // Helper class to parse NewsAPI response
+    static class NewsApiResponse {
+        private List<Article> articles;
 
-        // Filter articles based on selected team names
-        return dummyArticles.stream()
-            .filter(article -> teams.stream()
-                .anyMatch(team -> article.getTitle() != null &&
-                    article.getTitle().toLowerCase().contains(team.toLowerCase())))
-            .collect(Collectors.toList());
+        public List<Article> getArticles() {
+            return articles;
+        }
+
+        public void setArticles(List<Article> articles) {
+            this.articles = articles;
+        }
     }
 }
